@@ -1,0 +1,10 @@
+name = "modern-compiler-lean"
+version = "0.1.0"
+defaultTargets = ["modern-compiler-lean"]
+
+[[lean_lib]]
+name = "ModernCompilerLean"
+
+[[lean_exe]]
+name = "modern-compiler-lean"
+root = "Main"
