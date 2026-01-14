@@ -3,7 +3,7 @@ version = "0.1.0"
 defaultTargets = ["modern-compiler-lean"]
 
 [[lean_lib]]
-name = "ModernCompilerLean"
+name = "Tiger"
 
 [[lean_exe]]
 name = "modern-compiler-lean"
