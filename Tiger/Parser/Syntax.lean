@@ -25,22 +25,18 @@ syntax:70 tiger_expr " * " tiger_expr:71 : tiger_expr
 syntax:70 tiger_expr " / " tiger_expr:71 : tiger_expr
 syntax:90 "-" tiger_expr : tiger_expr
 syntax:20 tiger_expr " := " tiger_expr:20 : tiger_expr
-syntax "( " " )" : tiger_expr
-syntax "( " tiger_expr ("; " tiger_expr)* " )" : tiger_expr
-syntax:10 "if " tiger_expr " then " tiger_expr " else " tiger_expr : tiger_expr
-syntax:10 "if " tiger_expr " then " tiger_expr : tiger_expr
+syntax "( " sepBy(tiger_expr, ";") " )" : tiger_expr
+syntax:10 "if " tiger_expr " then " tiger_expr (" else " tiger_expr)? : tiger_expr
 syntax:10 "while " tiger_expr " do " tiger_expr : tiger_expr
 syntax:10 "for " ident " := " tiger_expr " to " tiger_expr " do " tiger_expr : tiger_expr
-syntax:10 "let " tiger_decl+ " in " tiger_expr : tiger_expr
+syntax:10 "let " tiger_decl* " in " tiger_expr : tiger_expr
 syntax ident "(" tiger_expr,* ")" : tiger_expr
 syntax ident "{ " (ident " = " tiger_expr),* " }" : tiger_expr
 syntax ident "[" tiger_expr "]" " of " tiger_expr : tiger_expr
 
 syntax:10 "type " ident " = " tiger_type : tiger_decl
-syntax:10 "var " ident " := " tiger_expr : tiger_decl
-syntax:10 "var " ident " : " ident " := " tiger_expr : tiger_decl
-syntax:10 "function " ident "( " (ident " : " ident),* " )" : tiger_decl
-syntax:10 "function " ident "( " (ident " : " ident),* " )" ": " ident : tiger_decl
+syntax:10 "var " ident (" : " ident)? " := " tiger_expr : tiger_decl
+syntax:10 "function " ident "( " (ident " : " ident),* " )" (": " ident)? " = " tiger_expr : tiger_decl
 
 syntax ident : tiger_type
 syntax "{ " (ident " : " ident),* " }" : tiger_type

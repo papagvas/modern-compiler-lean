@@ -2,4 +2,6 @@
 -- Import modules here that should be built as part of the library.
 import Tiger.Basic
 import Tiger.AST
-import Tiger.Syntax
+import Tiger.Parser.Syntax
+import Tiger.Location
+import Tiger.Parser.Elab

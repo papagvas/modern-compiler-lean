@@ -1,69 +1,92 @@
-inductive Tag where
-  | var   : Tag
-  | type  : Tag
-  | func  : Tag
-  | field : Tag
+import Tiger.Location
+open Tiger.Location
 
-structure Ident (a : Tag) where
-  private mk ::
-  name : String
+namespace Tiger.AST
 
-namespace Ident
+  inductive Tag where
+    | var   : Tag
+    | type  : Tag
+    | func  : Tag
+    | field : Tag
 
-  def mkVar (str : String) : Ident Tag.var     := Ident.mk str
-  def mkType (str : String) : Ident Tag.type   := Ident.mk str
-  def mkFunc (str : String) : Ident Tag.func   := Ident.mk str
-  def mkField (str : String) : Ident Tag.field := Ident.mk str
+  inductive Phase where
+    | parse : Phase
 
-end Ident
+-- syntactic construct (not sure what name to go with)
+  inductive SynCon where
+    | expr   : SynCon
+    | decl   : SynCon
+    | lvalue : SynCon
+    | kind   : SynCon
 
-structure Field (a : Type) where
-  name  : Ident Tag.field
-  field : a
+  def Ext (s : SynCon) (p : Phase) : Type := match s, p with
+    | _, .parse => SrcLoc
 
-inductive Kind where
-  | typeId    : Ident Tag.type → Kind
-  | typeMap   : List (Field (Ident Tag.type)) → Kind
-  | arrayType : Ident Tag.type → Kind
+  structure Ident (a : Tag) where
+    private mk ::
+    name : String
 
-inductive Op where
-  | plus  : Op
-  | minus : Op 
-  | mult  : Op 
-  | div   : Op 
-  | eq    : Op
-  | lt    : Op
-  | lte   : Op
-  | gt    : Op
-  | gte   : Op
-  | neq   : Op
+  namespace Ident
 
-mutual
-  inductive Decl where
-    | typeDecl : Ident Tag.type → Kind → Decl
-    | varDecl  : Ident Tag.var → Option (Ident Tag.type) → Expr → Decl
-    | funcDecl : Ident Tag.func → List (Field (Ident Tag.type)) → Option (Ident Tag.type) → Expr → Decl
+    def mkVar (str : String) : Ident Tag.var := Ident.mk str
+    def mkType (str : String) : Ident Tag.type := Ident.mk str
+    def mkFunc (str : String) : Ident Tag.func := Ident.mk str
+    def mkField (str : String) : Ident Tag.field := Ident.mk str
 
-  inductive Expr where
-    | nil : Expr
-    | breakE : Expr
-    | intE : Int → Expr
-    | strE : String → Expr
-    | lvalueE : LValue → Expr
-    | binE : Op → Expr → Expr → Expr
-    | negate : Expr → Expr
-    | assign : LValue → Expr → Expr
-    | seq : List Expr → Expr
-    | ifThenElse : Expr → Expr → Option Expr → Expr
-    | whileE : Expr → Expr → Expr
-    | forE : Ident Tag.var → Expr → Expr → Expr → Expr
-    | letE : List Decl → Expr → Expr
-    | funCall : Ident Tag.func → List Expr → Expr
-    | record : Ident Tag.type → List (Field Expr) → Expr
-    | arrayE : Ident Tag.type → Expr → Expr → Expr
+  end Ident
 
-  inductive LValue where
-    | var       : Ident Tag.var → LValue
-    | field     : LValue → Ident Tag.field → LValue
-    | subscript : LValue → Expr → LValue 
-end
+  structure Field (a : Type) where
+    name  : Ident Tag.field
+    field : a
+
+  inductive Kind (p : Phase) where
+    | typeId    : Ext .kind p → Ident Tag.type → Kind p
+    | typeMap   : Ext .kind p → List (Field (Ident Tag.type)) → Kind p
+    | arrayType : Ext .kind p → Ident Tag.type → Kind p
+
+  inductive Op where
+    | plus  : Op
+    | minus : Op 
+    | mult  : Op 
+    | div   : Op 
+
+  inductive CompOp where
+    | eq    : CompOp
+    | lt    : CompOp
+    | lte   : CompOp
+    | gt    : CompOp
+    | gte   : CompOp
+    | neq   : CompOp
+
+  mutual
+    inductive Decl (p : Phase) where
+      | typeDecl : Ext .decl p → Ident Tag.type → Kind p → Decl p
+      | varDecl  : Ext .decl p → Ident Tag.var → Option (Ident Tag.type) → Expr p → Decl p
+      | funcDecl : Ext .decl p → Ident Tag.func → List (Field (Ident Tag.type)) → Option (Ident Tag.type) → Expr p → Decl p
+
+    inductive Expr (p : Phase) where
+      | nil        : Ext .expr p → Expr p
+      | breakE     : Ext .expr p → Expr p
+      | intE       : Ext .expr p → Int → Expr p
+      | strE       : Ext .expr p → String → Expr p
+      | lvalueE    : Ext .expr p → LValue p → Expr p
+      | binE       : Ext .expr p → Op → Expr p → Expr p → Expr p
+      | compare    : Ext .expr p → CompOp → Expr p → Expr p → Expr p
+      | negate     : Ext .expr p → Expr p → Expr p
+      | assign     : Ext .expr p → LValue p → Expr p → Expr p
+      | seq        : Ext .expr p → List (Expr p) → Expr p
+      | ifThenElse : Ext .expr p → Expr p → Expr p → Option (Expr p) → Expr p
+      | whileE     : Ext .expr p → Expr p → Expr p → Expr p
+      | forE       : Ext .expr p → Ident Tag.var → Expr p → Expr p → Expr p → Expr p
+      | letE       : Ext .expr p → List (Decl p) → Expr p → Expr p
+      | funCall    : Ext .expr p → Ident Tag.func → List (Expr p) → Expr p
+      | record     : Ext .expr p → Ident Tag.type → List (Field (Expr p)) → Expr p
+      | arrayE     : Ext .expr p → Ident Tag.type → Expr p → Expr p → Expr p
+
+    inductive LValue (p : Phase) where
+      | var       : Ext .lvalue p → Ident Tag.var → LValue p
+      | field     : Ext .lvalue p → LValue p → Ident Tag.field → LValue p
+      | subscript : Ext .lvalue p → LValue p → Expr p → LValue p
+  end
+
+end Tiger.AST
