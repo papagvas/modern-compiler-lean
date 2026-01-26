@@ -18,12 +18,12 @@ namespace Tiger.Semant
           | some ty => pure ty
           | none    => throw s!"{pos}: {ident} is not defined"
       | .typeMap (pos : SrcLoc) tm => do
+        let (tenv, _) ← read
         let recs ← tm.foldlM (λ (recs', (set : HashSet String)) {name := n, field := f} => do
-          let (tenv, _) ← read
           match tenv.get? f.name, set.containsThenInsert n.name with
-            | _ , (false, _) => throw s!"{pos}: {n} is already defined"
+            | _ , (true, _) => throw s!"{pos}: {n} is already defined"
             | none, _ => throw s!"{pos}: {f} is not defined"
-            | some ty, (true, set') => pure ((n.name, ty) :: recs', set')) ({}, {})
+            | some ty, (false, set') => pure ((n.name, ty) :: recs', set')) ({}, {})
         let uid ← getUnique
         pure $ .record recs.1.reverse uid
       | .arrayType (pos : SrcLoc) ident => do
