@@ -8,6 +8,14 @@ namespace Tiger.AST
     | type  : Tag
     | func  : Tag
     | field : Tag
+    deriving Repr, BEq
+
+  instance : ToString Tag where
+    toString tag := match tag with
+      | .var => "variable"
+      | .type => "type"
+      | .func => "function"
+      | .field => "field"
 
   inductive Phase where
     | parse : Phase
@@ -25,6 +33,10 @@ namespace Tiger.AST
   structure Ident (a : Tag) where
     private mk ::
     name : String
+    deriving Repr, BEq
+
+  instance : ToString (Ident a) where
+    toString ident := s!"{a} {ident.name}"
 
   namespace Ident
 

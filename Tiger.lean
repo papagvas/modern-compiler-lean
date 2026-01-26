@@ -5,3 +5,5 @@ import Tiger.AST
 import Tiger.Parser.Syntax
 import Tiger.Location
 import Tiger.Parser.Elab
+import Tiger.Semant
+import Tiger.Semant.Types
