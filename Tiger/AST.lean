@@ -1,4 +1,6 @@
 import Tiger.Location
+import Tiger.Semant.Types
+
 open Tiger.Location
 
 namespace Tiger.AST
@@ -18,7 +20,9 @@ namespace Tiger.AST
       | .field => "field"
 
   inductive Phase where
-    | parse : Phase
+    | parse  : Phase
+    | semant : Phase
+    deriving Repr
 
 -- syntactic construct (not sure what name to go with)
   inductive SynCon where
@@ -26,9 +30,12 @@ namespace Tiger.AST
     | decl   : SynCon
     | lvalue : SynCon
     | kind   : SynCon
+    deriving Repr
 
   def Ext (s : SynCon) (p : Phase) : Type := match s, p with
     | _, .parse => SrcLoc
+    | .decl, .semant | .kind, .semant => SrcLoc
+    | .expr, .semant | .lvalue, .semant => SrcLoc × Tiger.Semant.Types.Ty 
 
   structure Ident (a : Tag) where
     private mk ::
@@ -70,11 +77,33 @@ namespace Tiger.AST
     | gte   : CompOp
     | neq   : CompOp
 
+  class HasInfo (A : (p : Phase) → Type) (s : outParam SynCon) where
+    getInfo {s} : A p → Ext s p 
+
   mutual
-    inductive Decl (p : Phase) where
-      | typeDecl : Ext .decl p → Ident Tag.type → Kind p → Decl p
-      | varDecl  : Ext .decl p → Ident Tag.var → Option (Ident Tag.type) → Expr p → Decl p
-      | funcDecl : Ext .decl p → Ident Tag.func → List (Field (Ident Tag.type)) → Option (Ident Tag.type) → Expr p → Decl p
+
+    structure TypeDecl (p : Phase) where
+      info : Ext .decl p
+      name : Ident .type
+      ty   : Kind p
+
+    structure FuncDecl (p : Phase) where
+      info : Ext .decl p
+      name : Ident .func
+      args : List (Field (Ident .type))
+      rty  : Option (Ident .type)
+      body : Expr p
+
+    structure VarDecl (p : Phase) where
+      info  : Ext .decl p
+      name  : Ident .var
+      ty    : Option (Ident .type)
+      value : Expr p
+
+    inductive Decls (p : Phase) where
+      | funcDecls : List (FuncDecl p) → Decls p
+      | typeDecls : List (TypeDecl p) → Decls p
+      | varDecls  : List (VarDecl p) → Decls p
 
     inductive Expr (p : Phase) where
       | nil        : Ext .expr p → Expr p
@@ -90,7 +119,7 @@ namespace Tiger.AST
       | ifThenElse : Ext .expr p → Expr p → Expr p → Option (Expr p) → Expr p
       | whileE     : Ext .expr p → Expr p → Expr p → Expr p
       | forE       : Ext .expr p → Ident Tag.var → Expr p → Expr p → Expr p → Expr p
-      | letE       : Ext .expr p → List (Decl p) → Expr p → Expr p
+      | letE       : Ext .expr p → List (Decls p) → Expr p → Expr p
       | funCall    : Ext .expr p → Ident Tag.func → List (Expr p) → Expr p
       | record     : Ext .expr p → Ident Tag.type → List (Field (Expr p)) → Expr p
       | arrayE     : Ext .expr p → Ident Tag.type → Expr p → Expr p → Expr p
@@ -99,6 +128,42 @@ namespace Tiger.AST
       | var       : Ext .lvalue p → Ident Tag.var → LValue p
       | field     : Ext .lvalue p → LValue p → Ident Tag.field → LValue p
       | subscript : Ext .lvalue p → LValue p → Expr p → LValue p
+
   end
 
+  instance : HasInfo FuncDecl .decl where
+    getInfo fdecl := fdecl.info
+
+  instance : HasInfo TypeDecl .decl where
+    getInfo tdecl := tdecl.info
+
+  instance : HasInfo VarDecl .decl where
+    getInfo vdecl := vdecl.info
+  
+  instance : HasInfo Expr .expr where
+    getInfo expr := match expr with
+      | .nil        info => info
+      | .breakE     info => info
+      | .intE       info  _ => info
+      | .strE       info  _ => info
+      | .lvalueE    info  _ => info
+      | .binE       info  _  _  _ => info
+      | .compare    info  _  _  _ => info
+      | .negate     info  _ => info
+      | .assign     info  _  _ => info
+      | .seq        info  _ => info
+      | .ifThenElse info  _  _  _ => info
+      | .whileE     info  _  _ => info
+      | .forE       info  _  _  _  _ => info
+      | .letE       info  _  _ => info
+      | .funCall    info  _  _ => info
+      | .record     info  _  _ => info
+      | .arrayE     info  _  _  _ => info
+
+  instance : HasInfo LValue .lvalue where
+    getInfo lv := match lv with
+      | .var       info _ => info
+      | .field     info _ _ => info
+      | .subscript info _ _ => info
+ 
 end Tiger.AST

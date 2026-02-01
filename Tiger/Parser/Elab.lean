@@ -101,9 +101,9 @@ namespace Tiger.Parser.Elab
           let expr3 ← elabExpr e3
           pure $ Tiger.AST.Expr.forE loc (Tiger.AST.Ident.mkVar i.getId.toString) expr1 expr2 expr3
         | `(tiger_expr| let $ds:tiger_decl* in $e:tiger_expr) => do
-          let decls ← ds.mapM (λ decl => elabDecl decl)
+          let decls ← elabDecls ds.toList
           let expr ← elabExpr e
-          pure $ Tiger.AST.Expr.letE loc decls.toList expr
+          pure $ Tiger.AST.Expr.letE loc decls expr
         | `(tiger_expr| $i:ident ($es:tiger_expr,*)) => do
           let exprs ← es.getElems.mapM (λ expr => elabExpr expr)
           pure $ Tiger.AST.Expr.funCall loc (Tiger.AST.Ident.mkFunc i.getId.toString) exprs.toList
@@ -140,27 +140,52 @@ namespace Tiger.Parser.Elab
             | some lvalue => pure ∘ some $ Tiger.AST.LValue.subscript loc lvalue expr
         | _ => pure none
     
-    partial def elabDecl (stx : TSyntax `tiger_decl) : ElabM (Tiger.AST.Decl .parse) := do
-      let fileMap ← read
-      let loc := toSrcLoc fileMap stx.raw
+    partial def elabDecls (stxs : List (TSyntax `tiger_decl)) : ElabM (List (Tiger.AST.Decls .parse)) :=
+      let reverseDecls := λ ds => match ds with
+        | Tiger.AST.Decls.typeDecls xs => Tiger.AST.Decls.typeDecls xs.reverse
+        | Tiger.AST.Decls.funcDecls xs => Tiger.AST.Decls.funcDecls xs.reverse
+        | Tiger.AST.Decls.varDecls  xs => Tiger.AST.Decls.varDecls xs.reverse
 
-      match stx with
-        | `(tiger_decl| type $i:ident = $t:tiger_type) => do
-          let ty ← elabKind t
-          pure $ Tiger.AST.Decl.typeDecl loc (Tiger.AST.Ident.mkType i.getId.toString) ty
-        | `(tiger_decl| var $i:ident $[ : $t:ident ]? := $e:tiger_expr) => do
-          let expr ← elabExpr e
-          pure $ Tiger.AST.Decl.varDecl loc (Tiger.AST.Ident.mkVar i.getId.toString) (t.map (λ ty => Tiger.AST.Ident.mkType ty.getId.toString)) expr
-        | `(tiger_decl| function $i:ident($[ $fs:ident : $ts:ident ],*) $[ : $rt:ident ]? = $e:tiger_expr) => do
-          let fname := Tiger.AST.Ident.mkFunc i.getId.toString
-          let rtName := rt.map (λ r => Tiger.AST.Ident.mkType r.getId.toString)
-          let fields := (fs.zip ts).toList.map (λ (f, t) =>
-            let name := Tiger.AST.Ident.mkField f.getId.toString
-            let field := Tiger.AST.Ident.mkType t.getId.toString
-            { name := name, field := field })
-          let expr ← elabExpr e
-          pure $ Tiger.AST.Decl.funcDecl loc fname fields rtName expr
-        | _ => throw s!"{loc}: Expected a declaration"
+      Functor.map List.reverse $ stxs.foldlM (λ decls (stx : TSyntax `tiger_decl) => do
+        let fileMap ← read
+        let loc := toSrcLoc fileMap stx.raw
+
+        match stx with
+          | `(tiger_decl| type $i:ident = $t:tiger_type) => do
+            let ty ← elabKind t
+            let decl := { info := loc, name := Tiger.AST.Ident.mkType i.getId.toString, ty := ty}
+            match decls with
+              | [] => pure ∘ List.singleton $ Tiger.AST.Decls.typeDecls [decl]
+              | gr :: rest => match gr with
+                | .typeDecls xs => pure $ .typeDecls (decl :: xs) :: rest
+                | _ => pure $ Tiger.AST.Decls.typeDecls [decl] :: reverseDecls gr :: rest
+          | `(tiger_decl| var $i:ident $[ : $t:ident ]? := $e:tiger_expr) => do
+            let expr ← elabExpr e
+            let decl := { info := loc
+                        , name := Tiger.AST.Ident.mkVar i.getId.toString
+                        , ty := t.map (λ ty => Tiger.AST.Ident.mkType ty.getId.toString)
+                        , value := expr 
+                        }
+            match decls with
+              | [] => pure ∘ List.singleton $ Tiger.AST.Decls.varDecls [decl]
+              | gr :: rest => match gr with
+                | .varDecls xs => pure $ .varDecls (decl :: xs) :: rest
+                | _ => pure $ Tiger.AST.Decls.varDecls [decl] :: reverseDecls gr :: rest
+          | `(tiger_decl| function $i:ident($[ $fs:ident : $ts:ident ],*) $[ : $rt:ident ]? = $e:tiger_expr) => do
+            let fname := Tiger.AST.Ident.mkFunc i.getId.toString
+            let rtName := rt.map (λ r => Tiger.AST.Ident.mkType r.getId.toString)
+            let fields := (fs.zip ts).toList.map (λ (f, t) =>
+              let name := Tiger.AST.Ident.mkField f.getId.toString
+              let field := Tiger.AST.Ident.mkType t.getId.toString
+              { name := name, field := field })
+            let expr ← elabExpr e
+            let decl := { info := loc, name := fname, args := fields, rty := rtName, body := expr }
+            match decls with
+              | [] => pure ∘ List.singleton $ Tiger.AST.Decls.funcDecls [decl]
+              | gr :: rest => match gr with
+                | .funcDecls xs => pure $ .funcDecls (decl :: xs) :: rest
+                | _ => pure $ Tiger.AST.Decls.funcDecls [decl] :: reverseDecls gr :: rest
+          | _ => throw s!"{loc}: Expected a declaration") []
     
     partial def elabKind (stx : TSyntax `tiger_type) : ElabM (Tiger.AST.Kind .parse) := do
       let fileMap ← read
