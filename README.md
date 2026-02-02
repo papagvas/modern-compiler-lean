@@ -20,7 +20,7 @@ This repo tries to closely follow the book, but still takes a few liberties.
 - [ ] Instruction Selection
 
 ## Structure of the Repo
-
+```
 ├── Main.lean
 ├── README.md
 ├── Tiger
@@ -37,3 +37,4 @@ This repo tries to closely follow the book, but still takes a few liberties.
 ├── lake-manifest.json
 ├── lakefile.toml
 └── lean-toolchain
+```
